@@ -1,2 +1,2 @@
 # vickze-lock
-Redis、Zookeeper分布式锁
+Java实现Redis、Zookeeper分布式锁
