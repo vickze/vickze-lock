@@ -47,11 +47,6 @@ public class RedisLock implements Lock {
     private static final long EXPIRE_SECS = 30;
 
     /**
-     * 锁等待时间，防止线程饥饿，默认10秒
-     */
-    private static final long TIMEOUT_SECS = 10;
-
-    /**
      * 随机等待时间最小值
      */
     private static final int MIN_RANDOM_SECS = 10;
@@ -79,7 +74,7 @@ public class RedisLock implements Lock {
         if (this.tryLock()) {
             return;
         }
-        throw new RuntimeException("服务器繁忙，请重试");
+        throw new RuntimeException("未能拿到锁");
     }
 
     @Override
@@ -89,11 +84,12 @@ public class RedisLock implements Lock {
 
     @Override
     public boolean tryLock() {
-        try {
-            return this.tryLock(TIMEOUT_SECS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        String lock = lockNameSpace + lockKey;
+        if (setNxAndExpire(lock, lockId, EXPIRE_SECS)) {
+            // 获得锁
+            locked = true;
         }
+        return locked;
     }
 
     /**
@@ -111,13 +107,12 @@ public class RedisLock implements Lock {
     @Override
     public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
         String lock = lockNameSpace + lockKey;
-
         long timeout = unit.toMillis(time);
         while (timeout >= 0) {
             if (setNxAndExpire(lock, lockId, EXPIRE_SECS)) {
                 // 获得锁
                 locked = true;
-                return true;
+                return locked;
             }
 
             // 生成[10-200]区间的随机毫秒
@@ -132,7 +127,7 @@ public class RedisLock implements Lock {
             Thread.sleep(delayMills);
         }
 
-        return false;
+        return locked;
     }
 
     /**

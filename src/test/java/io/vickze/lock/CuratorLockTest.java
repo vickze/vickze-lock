@@ -24,13 +24,13 @@ public class CuratorLockTest {
 
     private final int threads = 1000;
 
-    private volatile int i = 0;
+    private int i = 0;
 
-    private volatile int j = 0;
+    private int j = 0;
 
-    private volatile int k = 0;
+    private int k = 0;
 
-    private volatile int l = 0;
+    private int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
 
@@ -59,6 +59,7 @@ public class CuratorLockTest {
                 InterProcessMutex lock = new InterProcessMutex(client, "/lock/test");
                 long startTime = System.currentTimeMillis();
                 try {
+                    //尝试加锁，最多等待10秒
                     if (lock.acquire(10, TimeUnit.SECONDS)) {
                         if (stock > 0) {
                             stock--;
@@ -70,7 +71,6 @@ public class CuratorLockTest {
                     } else {
                         incrementK();
                     }
-                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                 } catch (Exception e) {
                     incrementL();
                     logger.error(e.getMessage(), e);
@@ -80,6 +80,7 @@ public class CuratorLockTest {
                     } catch (Exception e) {
                         logger.error(e.getMessage(), e);
                     }
+                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                     client.close();
                     countDownLatch.countDown();
                 }
@@ -101,11 +102,11 @@ public class CuratorLockTest {
         }
     }
 
-    private synchronized void incrementI() {
+    private void incrementI() {
         i++;
     }
 
-    private synchronized void incrementJ() {
+    private void incrementJ() {
         j++;
     }
 

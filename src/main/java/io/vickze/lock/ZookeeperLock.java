@@ -34,6 +34,9 @@ public class ZookeeperLock implements Lock {
     private String currentNode;
     //等待的前一个节点
     private String waitNode;
+    //竞争的节点列表
+    private List<String> lockNodes;
+
     //计数器
     private volatile CountDownLatch countDownLatch;
 
@@ -41,11 +44,6 @@ public class ZookeeperLock implements Lock {
      * 是否持有锁
      */
     private volatile boolean locked = false;
-
-    /**
-     * 锁等待时间，防止线程饥饿，默认10秒
-     */
-    private static final long TIMEOUT_SECS = 30;
 
 
     public ZookeeperLock(String address, int timeout, String lockNamespace, String lockKey) {
@@ -60,8 +58,8 @@ public class ZookeeperLock implements Lock {
                     logger.debug("Zookeeper连接已建立...")
             );
         } catch (Exception e) {
-            logger.error(e.getMessage(), e.getCause());
-            throw new RuntimeException(e.getMessage(), e.getCause());
+            logger.error(e.getMessage(), e);
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -70,7 +68,7 @@ public class ZookeeperLock implements Lock {
         if (this.tryLock()) {
             return;
         }
-        throw new RuntimeException("服务器繁忙，请重试");
+        throw new RuntimeException("未能拿到锁");
     }
 
     @Override
@@ -80,24 +78,6 @@ public class ZookeeperLock implements Lock {
 
     @Override
     public boolean tryLock() {
-        try {
-            return this.tryLock(TIMEOUT_SECS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Zookeeper分布式锁
-     * 实现思路：
-     *   使用Zookeeper最小节点的方式
-     * 执行过程：
-     *   1、创建根节点，在根节点下创建顺序节点
-     *   2、如当前创建的节点为根节点的所有子节点中最小的，则获取锁成功；
-     *   否则，找到当前节点的前一个节点，watch前一个节点，当前一个节点被删除时获得锁；另外，等待超时也不能获得锁
-     */
-    @Override
-    public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
         String lock = lockNamespace + "/" + lockKey;
 
         try {
@@ -115,7 +95,7 @@ public class ZookeeperLock implements Lock {
             //取出所有子节点
             List<String> childrenList = zooKeeper.getChildren(lockNamespace, false);
             //竞争的节点列表
-            List<String> lockNodes = new ArrayList<>();
+            lockNodes = new ArrayList<>();
             for (String children : childrenList) {
                 if (children.startsWith(lockKey)) {
                     lockNodes.add(children);
@@ -126,16 +106,36 @@ public class ZookeeperLock implements Lock {
             //如当前节点为最小节点，则成功获取锁
             if (currentNode.equals(lockNodes.get(0))) {
                 locked = true;
-                return true;
+            }
+            return locked;
+        } catch (InterruptedException | KeeperException e) {
+            logger.error(e.getMessage(), e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Zookeeper分布式锁
+     * 实现思路：
+     * 使用Zookeeper最小节点的方式
+     * 执行过程：
+     * 1、创建根节点，在根节点下创建顺序节点
+     * 2、如当前创建的节点为根节点的所有子节点中最小的，则获取锁成功；
+     * 否则，找到当前节点的前一个节点，watch前一个节点，当前一个节点被删除时获得锁；另外，等待超时也不能获得锁
+     */
+    @Override
+    public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
+        //等待锁
+        try {
+            if (tryLock()) {
+                return locked;
             }
             //找到当前节点的前一个节点
             waitNode = lockNodes.get(Collections.binarySearch(lockNodes, currentNode) - 1);
-            //等待锁
             waitLock(time, unit);
-
             return locked;
         } catch (KeeperException e) {
-            logger.error(e.getMessage(), e.getCause());
+            logger.error(e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }

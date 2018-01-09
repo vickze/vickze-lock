@@ -33,13 +33,13 @@ public class RedisLockTest {
 
     private final int threads = 510;
 
-    private volatile int i = 0;
+    private int i = 0;
 
-    private volatile int j = 0;
+    private int j = 0;
 
-    private volatile int k = 0;
+    private int k = 0;
 
-    private volatile int l = 0;
+    private int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
 
@@ -66,7 +66,8 @@ public class RedisLockTest {
 
                 long startTime = System.currentTimeMillis();
                 try {
-                    if (redisLock.tryLock()) {
+                    //尝试加锁，最多等待10秒，默认最多30秒后解锁
+                    if (redisLock.tryLock(10, TimeUnit.SECONDS)) {
                         if (stock > 0) {
                             stock--;
                             incrementI();
@@ -77,11 +78,11 @@ public class RedisLockTest {
                     } else {
                         incrementK();
                     }
-                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                 } catch (Exception e) {
                     incrementL();
-                    e.printStackTrace();
+                    logger.error(e.getMessage(), e);
                 } finally {
+                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                     redisLock.unlock();
                     countDownLatch.countDown();
                 }
@@ -103,11 +104,11 @@ public class RedisLockTest {
         }
     }
 
-    private synchronized void incrementI() {
+    private void incrementI() {
         i++;
     }
 
-    private synchronized void incrementJ() {
+    private void incrementJ() {
         j++;
     }
 

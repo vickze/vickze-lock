@@ -34,13 +34,13 @@ public class RedissonLockTest {
 
     private final int threads = 1510;
 
-    private volatile int i = 0;
+    private int i = 0;
 
-    private volatile int j = 0;
+    private int j = 0;
 
-    private volatile int k = 0;
+    private int k = 0;
 
-    private volatile int l = 0;
+    private int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
 
@@ -73,11 +73,11 @@ public class RedissonLockTest {
                     } else {
                         incrementK();
                     }
-                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                 } catch (Exception e) {
                     incrementL();
-                    e.printStackTrace();
+                    logger.error(e.getMessage(), e);
                 } finally {
+                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                     lock.unlock();
                     countDownLatch.countDown();
                 }
@@ -99,11 +99,11 @@ public class RedissonLockTest {
         }
     }
 
-    private synchronized void incrementI() {
+    private void incrementI() {
         i++;
     }
 
-    private synchronized void incrementJ() {
+    private void incrementJ() {
         j++;
     }
 

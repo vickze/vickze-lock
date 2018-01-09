@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 /**
@@ -19,13 +20,13 @@ public class ZookeeperLockTest {
 
     private final int threads = 510;
 
-    private volatile int i = 0;
+    private int i = 0;
 
-    private volatile int j = 0;
+    private int j = 0;
 
-    private volatile int k = 0;
+    private int k = 0;
 
-    private volatile int l = 0;
+    private int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
 
@@ -38,7 +39,8 @@ public class ZookeeperLockTest {
 
                 long startTime = System.currentTimeMillis();
                 try {
-                    if (zookeeperLock.tryLock()) {
+                    //尝试加锁，最多等待10秒
+                    if (zookeeperLock.tryLock(10, TimeUnit.SECONDS)) {
                         if (stock > 0) {
                             stock--;
                             incrementI();
@@ -49,11 +51,11 @@ public class ZookeeperLockTest {
                     } else {
                         incrementK();
                     }
-                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                 } catch (Exception e) {
                     incrementL();
-                    e.printStackTrace();
+                    logger.error(e.getMessage(), e);
                 } finally {
+                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
                     zookeeperLock.unlock();
                     countDownLatch.countDown();
                 }
@@ -75,11 +77,11 @@ public class ZookeeperLockTest {
         }
     }
 
-    private synchronized void incrementI() {
+    private void incrementI() {
         i++;
     }
 
-    private synchronized void incrementJ() {
+    private void incrementJ() {
         j++;
     }
 
