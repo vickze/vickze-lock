@@ -30,7 +30,7 @@ public class CuratorLockTest {
 
     private int k = 0;
 
-    private int l = 0;
+    private volatile int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
 

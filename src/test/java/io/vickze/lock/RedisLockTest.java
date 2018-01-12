@@ -63,7 +63,6 @@ public class RedisLockTest {
         for (int n = 0; n < threads; n++) {
             new Thread(() -> {
                 Lock redisLock = new RedisLock(shardedJedisPool, "lock", "test");
-
                 long startTime = System.currentTimeMillis();
                 try {
                     //尝试加锁，最多等待10秒，默认最多30秒后解锁

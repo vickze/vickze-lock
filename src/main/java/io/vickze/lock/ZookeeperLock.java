@@ -47,12 +47,12 @@ public class ZookeeperLock implements Lock {
 
 
     public ZookeeperLock(String address, int timeout, String lockNamespace, String lockKey) {
-        init(address, timeout, lockNamespace);
+        init(address, timeout);
         this.lockNamespace = "/" + lockNamespace;
         this.lockKey = lockKey + "_";
     }
 
-    private void init(String address, int timeout, String lockNamespace) {
+    private void init(String address, int timeout) {
         try {
             zooKeeper = new ZooKeeper(address, timeout, watchedEvent ->
                     logger.debug("Zookeeper连接已建立...")

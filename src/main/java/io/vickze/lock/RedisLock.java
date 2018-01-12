@@ -100,7 +100,7 @@ public class RedisLock implements Lock {
      * 通过setNx尝试设置某个key的值，成功（当前没有这个锁）则返回，成功获得锁
      * 失败，则等待，继续尝试获取锁，如等待超时，返回（未获得锁）
      *
-     * @param time 锁等待时间毫秒
+     * @param time 锁等待时间
      * @return
      * @throws InterruptedException
      */
