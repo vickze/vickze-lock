@@ -10,11 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
 /**
  * @author vick.zeng
- * @email zengyukang@hey900.com
+ * @email zyk@yk95.top
  * @date 2018-01-08 16:45
  */
 public class CuratorLockTest {
@@ -33,6 +34,8 @@ public class CuratorLockTest {
     private volatile int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
+
+    private CyclicBarrier cyclicBarrier = new CyclicBarrier(threads);
 
     private CuratorFramework client;
 
@@ -59,6 +62,8 @@ public class CuratorLockTest {
                 InterProcessMutex lock = new InterProcessMutex(client, "/lock/test");
                 long startTime = System.currentTimeMillis();
                 try {
+                    //等到全部线程准备好才开始执行，模拟并发
+                    cyclicBarrier.await();
                     //尝试加锁，最多等待10秒
                     if (lock.acquire(10, TimeUnit.SECONDS)) {
                         if (stock > 0) {

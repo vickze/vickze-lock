@@ -11,17 +11,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisShardInfo;
-import redis.clients.jedis.ShardedJedisPool;
-
 /**
  * @author vick.zeng
- * @email zengyukang@hey900.com
+ * @email zyk@yk95.top
  * @date 2018-01-08 17:52
  */
 public class RedissonLockTest {
@@ -32,7 +30,7 @@ public class RedissonLockTest {
 
     private int stock = 500;
 
-    private final int threads = 1510;
+    private final int threads = 510;
 
     private int i = 0;
 
@@ -43,6 +41,8 @@ public class RedissonLockTest {
     private int l = 0;
 
     private CountDownLatch countDownLatch = new CountDownLatch(threads);
+
+    private CyclicBarrier cyclicBarrier = new CyclicBarrier(threads);
 
     @Before
     public void before() {
@@ -61,6 +61,8 @@ public class RedissonLockTest {
                 RLock lock = redisson.getLock("lock:test");
                 long startTime = System.currentTimeMillis();
                 try {
+                    //等到全部线程准备好才开始执行，模拟并发
+                    cyclicBarrier.await();
                     //尝试加锁，最多等待10秒，上锁以后30秒自动解锁
                     if (lock.tryLock(10, 30, TimeUnit.SECONDS)) {
                         if (stock > 0) {

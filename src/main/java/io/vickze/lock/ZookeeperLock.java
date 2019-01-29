@@ -19,7 +19,7 @@ import java.util.concurrent.locks.Lock;
 
 /**
  * @author vick.zeng
- * @email zengyukang@hey900.com
+ * @email zyk@yk95.top
  * @date 2018-01-04 18:12
  */
 public class ZookeeperLock implements Lock {
