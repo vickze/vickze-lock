@@ -3,28 +3,39 @@ package io.vickze.lock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
-import redis.clients.jedis.ShardedJedis;
-import redis.clients.jedis.ShardedJedisPool;
+import org.springframework.data.redis.connection.RedisStringCommands;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.data.redis.core.types.Expiration;
 
 /**
  * Redis简易分布式锁
- * setNx实现
+ * setNx实现 使用RedisTemplate
  *
  * @author vick.zeng
  * @email zyk@yk95.top
- * @date 2017-12-07 16:27
+ * @date 2019-01-29 15:19
  */
 public class RedisLock implements Lock {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private ShardedJedisPool shardedJedisPool;
+    private static final String UNLOCK_SCRIPTS = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
+    private static final RedisScript<Long> UNLOCK_REDIS_SCRIPTS = new DefaultRedisScript<>(UNLOCK_SCRIPTS, Long.class);
+
+    private static final Long UNLOCK_SUCCESS = 1L;
+
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 锁ID
@@ -62,9 +73,9 @@ public class RedisLock implements Lock {
     private volatile boolean locked = false;
 
 
-    public RedisLock(ShardedJedisPool shardedJedisPool, String lockNameSpace, String lockKey) {
+    public RedisLock(StringRedisTemplate stringRedisTemplate, String lockNameSpace, String lockKey) {
         this.lockId = UUID.randomUUID().toString();
-        this.shardedJedisPool = shardedJedisPool;
+        this.stringRedisTemplate = stringRedisTemplate;
         this.lockNameSpace = lockNameSpace + ":";
         this.lockKey = lockKey;
     }
@@ -136,12 +147,15 @@ public class RedisLock implements Lock {
     public void unlock() {
         if (locked) {
             String lock = lockNameSpace + lockKey;
-            ShardedJedis shardedJedis = shardedJedisPool.getResource();
             //避免删除非自己获取得到的锁
-            if (lockId.equals(shardedJedis.get(lock))) {
-                shardedJedis.del(lock);
+//            if (lockId.equals(stringRedisTemplate.opsForValue().get(lock))) {
+//                stringRedisTemplate.delete(lock);
+//            }
+            //不使用 DEL 命令来释放锁，而是发送一个 Lua 脚本，这个脚本只在客户端传入的值和键的口令串相匹配时，才对键进行删除。
+            if (!UNLOCK_SUCCESS.equals(stringRedisTemplate.execute(UNLOCK_REDIS_SCRIPTS, Collections.singletonList(lock), lockId))) {
+                logger.debug("释放锁未成功，锁ID：{}，锁值：{}", lockId, lock);
             }
-            shardedJedis.close();
+
             locked = false;
         }
     }
@@ -173,9 +187,7 @@ public class RedisLock implements Lock {
      * @return
      */
     private boolean setNxAndExpire(final String key, final String value, final long expire) {
-        ShardedJedis shardedJedis = shardedJedisPool.getResource();
-        String result = shardedJedis.set(key, value, "NX", "PX", expire);
-        shardedJedis.close();
-        return "OK".equals(result);
+        return stringRedisTemplate.execute((RedisCallback<Boolean>) connection -> connection.set(key.getBytes(),
+                value.getBytes(), Expiration.from(expire, TimeUnit.SECONDS), RedisStringCommands.SetOption.SET_IF_ABSENT));
     }
 }

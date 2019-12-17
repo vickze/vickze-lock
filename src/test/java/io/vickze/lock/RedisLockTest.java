@@ -30,8 +30,6 @@ import redis.clients.jedis.ShardedJedisPool;
 public class RedisLockTest {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private ShardedJedisPool shardedJedisPool;
-
     private StringRedisTemplate jedisStringTemplate;
 
     private StringRedisTemplate lettuceStringTemplate;
@@ -55,18 +53,6 @@ public class RedisLockTest {
 
     @Before
     public void before() {
-        JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-        List<JedisShardInfo> jedisShardInfoList = new ArrayList<>();
-        String[] hostList = {"127.0.0.1"};
-
-        for (String host : hostList) {
-            JedisShardInfo jedisShardInfo = new JedisShardInfo(host);
-            //jedisShardInfo.setPassword(password);
-            jedisShardInfoList.add(jedisShardInfo);
-        }
-        shardedJedisPool = new ShardedJedisPool(jedisPoolConfig, jedisShardInfoList);
-
-
         RedisStandaloneConfiguration redisStandaloneConfiguration = new RedisStandaloneConfiguration();
         redisStandaloneConfiguration.setHostName("127.0.0.1");
         redisStandaloneConfiguration.setPort(6379);
@@ -88,13 +74,13 @@ public class RedisLockTest {
 
         lettuceStringTemplate = new StringRedisTemplate(lettuceConnectionFactory);
     }
-
+    
     @Test
-    public void redisLockTest() throws InterruptedException {
+    public void redisLockJedisTest() throws InterruptedException {
         // 多线程测试
         for (int n = 0; n < threads; n++) {
             new Thread(() -> {
-                Lock redisLock = new RedisLock(shardedJedisPool, "lock", "test");
+                Lock redisLock = new RedisLock(jedisStringTemplate, "lock", "test");
                 long startTime = System.currentTimeMillis();
                 try {
                     //等到全部线程准备好才开始执行，模拟并发
@@ -138,59 +124,11 @@ public class RedisLockTest {
     }
 
     @Test
-    public void redisLock2JedisTest() throws InterruptedException {
+    public void redisLockTestLettuce() throws InterruptedException {
         // 多线程测试
         for (int n = 0; n < threads; n++) {
             new Thread(() -> {
-                Lock redisLock = new RedisLock2(jedisStringTemplate, "lock", "test");
-                long startTime = System.currentTimeMillis();
-                try {
-                    //等到全部线程准备好才开始执行，模拟并发
-                    cyclicBarrier.await();
-                    //尝试加锁，最多等待10秒，默认最多30秒后解锁
-                    if (redisLock.tryLock(10, TimeUnit.SECONDS)) {
-                        if (stock > 0) {
-                            stock--;
-                            incrementI();
-                            logger.debug("剩余库存:{}", stock);
-                        } else {
-                            incrementJ();
-                        }
-                    } else {
-                        incrementK();
-                    }
-                } catch (Exception e) {
-                    incrementL();
-                    logger.error(e.getMessage(), e);
-                } finally {
-                    logger.debug("花费：{}ms", System.currentTimeMillis() - startTime);
-                    redisLock.unlock();
-                    countDownLatch.countDown();
-                }
-            }).start();
-        }
-
-        // 主线程休眠，不然主线程结束子线程不会执行
-        countDownLatch.await();
-
-        logger.debug("已减库存 {}", i);
-        logger.debug("没有更多库存了 {}", j);
-        logger.debug("未能拿到锁 {}", k);
-        logger.debug("获取锁异常 {}", l);
-
-        if (i + j + k + l == threads) {
-            logger.debug("成功锁住代码块");
-        } else {
-            logger.error("未能锁住代码块");
-        }
-    }
-
-    @Test
-    public void redisLock2TestLettuce() throws InterruptedException {
-        // 多线程测试
-        for (int n = 0; n < threads; n++) {
-            new Thread(() -> {
-                Lock redisLock = new RedisLock2(lettuceStringTemplate, "lock", "test");
+                Lock redisLock = new RedisLock(lettuceStringTemplate, "lock", "test");
                 long startTime = System.currentTimeMillis();
                 try {
                     //等到全部线程准备好才开始执行，模拟并发
